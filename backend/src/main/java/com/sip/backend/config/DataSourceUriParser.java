@@ -33,6 +33,11 @@ public class DataSourceUriParser {
             return;
         }
 
+        uri = uri.trim();
+        if ((uri.startsWith("'") && uri.endsWith("'")) || (uri.startsWith("\"") && uri.endsWith("\""))) {
+            uri = uri.substring(1, uri.length() - 1).trim();
+        }
+
         // Strip jdbc:postgresql:// prefix if present (Render may set DATABASE_URL
         // in that form rather than the raw postgresql:// scheme URI expects)
         if (uri.startsWith("jdbc:")) {

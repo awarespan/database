@@ -62,7 +62,26 @@ sourceSets {
         java {
             srcDirs = ['backend/src/main/java']
         }
+        resources {
+            srcDirs = ['backend/src/main/resources']
+        }
+    }
+    test {
+        java {
+            srcDirs = ['backend/src/test/java']
+        }
+        resources {
+            srcDirs = ['backend/src/test/resources']
+        }
     }
 }
 
-bootJar { archiveFileName = 'sip-backend-0.1.0.jar' }
+bootJar {
+    archiveFileName = 'sip-backend-0.1.0.jar'
+    doLast {
+        copy {
+            from archiveFile
+            into file("${projectDir}/backend")
+        }
+    }
+}
