@@ -1,0 +1,25 @@
+pluginManagement {
+    def localMaven = new File("${System.getProperty('user.home')}/AppData/Local/Temp/local-maven")
+    repositories {
+        if (localMaven.exists()) {
+            maven { url "file:///${localMaven.absolutePath.replace('\\', '/')}" }
+        }
+        maven { url 'https://repo1.maven.org/maven2' }
+        maven { url 'https://repo.maven.apache.org/maven2' }
+        gradlePluginPortal()
+    }
+}
+
+def localMaven = new File("${System.getProperty('user.home')}/AppData/Local/Temp/local-maven")
+
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    repositories {
+        if (localMaven.exists()) {
+            maven { url "file:///${localMaven.absolutePath.replace('\\', '/')}" }
+        }
+        maven { url 'https://repo1.maven.org/maven2' }
+        maven { url 'https://repo.maven.apache.org/maven2' }
+    }
+}
+rootProject.name = 'sip-backend'

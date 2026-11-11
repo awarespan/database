@@ -1,0 +1,17 @@
+# Gradle
+.gradle/
+build/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# Env files with secrets
+.env
+*.pem
+*.key
+
+# OS
+.DS_Store
+Thumbs.db

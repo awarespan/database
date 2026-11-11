@@ -1,0 +1,8 @@
+**/.gradle/
+**/node_modules/
+**/.git/
+**/.DS_Store
+**/*.class
+**/.env
+**/gradle/wrapper/dists/
+database/backend/build/
