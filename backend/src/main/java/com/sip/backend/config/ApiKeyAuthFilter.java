@@ -51,7 +51,9 @@ public class ApiKeyAuthFilter extends OncePerRequestFilter {
         // Check if this is a device-facing endpoint
         boolean isDeviceEndpoint = 
             (path.startsWith("/api/v1/nodes/") && path.endsWith("/heartbeat")) ||
-            ("POST".equalsIgnoreCase(method) && path.startsWith("/api/v1/incidents"));
+            ("POST".equalsIgnoreCase(method) && path.startsWith("/api/v1/incidents")) ||
+            path.startsWith("/api/v1/commands/") ||
+            path.startsWith("/api/v1/media/");
 
         if (isDeviceEndpoint) {
             // If already authenticated (e.g. by JWT earlier), proceed

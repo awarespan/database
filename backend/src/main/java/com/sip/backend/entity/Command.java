@@ -14,7 +14,7 @@ public class Command {
 
     public enum CommandType {
         SIREN, DETERRENCE, SILENCE, MODEL_UPDATE, CONFIG_SYNC, REBOOT, SHUTDOWN,
-        SET_AUTOPILOT, CLEAR_AUTOPILOT, EMERGENCY_STOP, STATUS_QUERY
+        SET_AUTOPILOT, CLEAR_AUTOPILOT, EMERGENCY_STOP, STATUS_QUERY, MEDIA_INGEST
     }
 
     public enum Status {
@@ -58,6 +58,7 @@ public class Command {
     @Column(name = "failure_reason")
     private String failureReason;
 
+    @com.fasterxml.jackson.annotation.JsonIgnore
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "node_id", insertable = false, updatable = false)
     private Node node;

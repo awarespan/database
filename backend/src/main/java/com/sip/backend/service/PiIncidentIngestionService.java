@@ -26,14 +26,20 @@ public class PiIncidentIngestionService {
     private final IncidentRepository incidentRepository;
     private final DetectionResultRepository detectionResultRepository;
     private final NodeRepository nodeRepository;
+    private final com.sip.backend.realtime.WebSocketBroadcaster broadcaster;
+    private final com.sip.backend.incident.IncidentMapper mapper;
 
     public PiIncidentIngestionService(
             IncidentRepository incidentRepository,
             DetectionResultRepository detectionResultRepository,
-            NodeRepository nodeRepository) {
+            NodeRepository nodeRepository,
+            @org.springframework.beans.factory.annotation.Autowired(required = false) com.sip.backend.realtime.WebSocketBroadcaster broadcaster,
+            @org.springframework.beans.factory.annotation.Autowired(required = false) com.sip.backend.incident.IncidentMapper mapper) {
         this.incidentRepository = incidentRepository;
         this.detectionResultRepository = detectionResultRepository;
         this.nodeRepository = nodeRepository;
+        this.broadcaster = broadcaster;
+        this.mapper = mapper;
     }
 
     /**
@@ -114,6 +120,15 @@ public class PiIncidentIngestionService {
 
         log.info("Ingested incident {} from node {} tier={} domain={}",
                 incident.id, payload.getNodeId(), tier, payload.getDetectionDomain());
+
+        if (broadcaster != null && mapper != null) {
+            try {
+                broadcaster.broadcastIncidentNew(mapper.toDto(incident));
+                log.info("Broadcasted real-time incident {} to websocket clients", incident.id);
+            } catch (Exception e) {
+                log.warn("Failed to broadcast real-time incident {}: {}", incident.id, e.getMessage());
+            }
+        }
 
         return incident;
     }
