@@ -32,7 +32,7 @@ public interface CommandRepository extends JpaRepository<Command, String> {
     int markDispatched(@Param("id") String id, @Param("newStatus") Command.Status newStatus, @Param("dispatchedAt") Instant dispatchedAt);
 
     @Modifying
-    @Query("UPDATE Command c SET c.status = 'ACKNOWLEDGED', c.acknowledgedAt = :ackAt WHERE c.id = :id AND c.status = 'DISPATCHED'")
+    @Query("UPDATE Command c SET c.status = 'ACKNOWLEDGED', c.acknowledgedAt = :ackAt WHERE c.id = :id AND c.status IN ('PENDING', 'DISPATCHED')")
     int markAcknowledged(@Param("id") String id, @Param("ackAt") Instant ackAt);
 
     @Modifying
