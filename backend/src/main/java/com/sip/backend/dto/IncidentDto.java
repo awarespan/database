@@ -1,6 +1,7 @@
 package com.sip.backend.dto;
 
 import java.time.OffsetDateTime;
+import java.util.List;
 
 public class IncidentDto {
     public String id;
@@ -19,6 +20,7 @@ public class IncidentDto {
     public OffsetDateTime updatedAt;
     public DetectionResultDto detection;
     public IncidentDetailDto detail;
+    public List<ResponseEventDto> responseEvents;
 
     public IncidentDto() {}
 }

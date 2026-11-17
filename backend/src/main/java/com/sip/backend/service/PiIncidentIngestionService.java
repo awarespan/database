@@ -5,9 +5,11 @@ import com.sip.backend.entity.DetectionResult;
 import com.sip.backend.entity.Incident;
 import com.sip.backend.entity.Incident.*;
 import com.sip.backend.entity.Node;
+import com.sip.backend.entity.ResponseEvent;
 import com.sip.backend.repository.DetectionResultRepository;
 import com.sip.backend.repository.IncidentRepository;
 import com.sip.backend.repository.NodeRepository;
+import com.sip.backend.repository.ResponseEventRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -26,6 +28,7 @@ public class PiIncidentIngestionService {
     private final IncidentRepository incidentRepository;
     private final DetectionResultRepository detectionResultRepository;
     private final NodeRepository nodeRepository;
+    private final ResponseEventRepository responseEventRepository;
     private final com.sip.backend.realtime.WebSocketBroadcaster broadcaster;
     private final com.sip.backend.incident.IncidentMapper mapper;
 
@@ -33,11 +36,13 @@ public class PiIncidentIngestionService {
             IncidentRepository incidentRepository,
             DetectionResultRepository detectionResultRepository,
             NodeRepository nodeRepository,
+            ResponseEventRepository responseEventRepository,
             @org.springframework.beans.factory.annotation.Autowired(required = false) com.sip.backend.realtime.WebSocketBroadcaster broadcaster,
             @org.springframework.beans.factory.annotation.Autowired(required = false) com.sip.backend.incident.IncidentMapper mapper) {
         this.incidentRepository = incidentRepository;
         this.detectionResultRepository = detectionResultRepository;
         this.nodeRepository = nodeRepository;
+        this.responseEventRepository = responseEventRepository;
         this.broadcaster = broadcaster;
         this.mapper = mapper;
     }
@@ -113,6 +118,31 @@ public class PiIncidentIngestionService {
             detectionResultRepository.save(dr);
         }
 
+        // Persist the Pi's actual deterrence attempt/result as a first-class response event.
+        ResponseEvent deterrenceEvent = null;
+        var deterrence = payload.getDeterrence();
+        if (deterrence != null && Boolean.TRUE.equals(deterrence.get("attempted"))) {
+            deterrenceEvent = new ResponseEvent();
+            deterrenceEvent.id = UUID.randomUUID().toString();
+            deterrenceEvent.incident = incident;
+            deterrenceEvent.actionType = ResponseEvent.ActionType.DETERRENCE;
+            deterrenceEvent.timestamp = OffsetDateTime.now();
+            deterrenceEvent.autonomous = true;
+            boolean started = Boolean.TRUE.equals(deterrence.get("started"));
+            String reason = String.valueOf(deterrence.getOrDefault("reason", "unknown"));
+            Object frequency = deterrence.get("frequencyHz");
+            Object duration = deterrence.get("durationSeconds");
+            Object emission = deterrence.get("emissionCount");
+            Object output = deterrence.get("outputDevice");
+            deterrenceEvent.result = (started ? "STARTED" : "NOT_STARTED")
+                    + "; reason=" + reason
+                    + (frequency != null ? "; frequency=" + frequency + "Hz" : "")
+                    + (duration != null ? "; duration=" + duration + "s" : "")
+                    + (emission != null ? "; emission=" + emission : "")
+                    + (output != null ? "; output=" + output : "");
+            responseEventRepository.save(deterrenceEvent);
+        }
+
         // Update node last heartbeat
         node.lastHeartbeat = OffsetDateTime.now();
         node.status = Node.NodeStatus.ONLINE;
@@ -123,8 +153,27 @@ public class PiIncidentIngestionService {
 
         if (broadcaster != null && mapper != null) {
             try {
-                broadcaster.broadcastIncidentNew(mapper.toDto(incident));
-                log.info("Broadcasted real-time incident {} to websocket clients", incident.id);
+                var incidentDto = mapper.toDto(incident);
+                if (deterrenceEvent != null) {
+                    incidentDto.responseEvents = java.util.List.of(mapper.toResponseEventDto(deterrenceEvent));
+                }
+                String broadcastIncidentId = incident.id;
+                Runnable broadcast = () -> {
+                    try {
+                        broadcaster.broadcastIncidentNew(incidentDto);
+                        log.info("Broadcasted committed incident {} to websocket clients", broadcastIncidentId);
+                    } catch (Exception broadcastError) {
+                        log.warn("Failed to broadcast committed incident {}: {}", broadcastIncidentId, broadcastError.getMessage());
+                    }
+                };
+                if (org.springframework.transaction.support.TransactionSynchronizationManager.isSynchronizationActive()) {
+                    org.springframework.transaction.support.TransactionSynchronizationManager.registerSynchronization(
+                            new org.springframework.transaction.support.TransactionSynchronization() {
+                                @Override public void afterCommit() { broadcast.run(); }
+                            });
+                } else {
+                    broadcast.run();
+                }
             } catch (Exception e) {
                 log.warn("Failed to broadcast real-time incident {}: {}", incident.id, e.getMessage());
             }

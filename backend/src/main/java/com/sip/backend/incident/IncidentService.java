@@ -13,6 +13,9 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Map;
+import java.util.HashMap;
+import java.util.ArrayList;
 import java.util.UUID;
 
 @Service
@@ -75,7 +78,21 @@ public class IncidentService {
         } else {
             result = incidentRepository.search(stateFilter, nodeId, typeFilter, fromDt, toDt, pr);
         }
-        List<IncidentDto> dtos = result.getContent().stream().map(mapper::toDto).toList();
+        List<Incident> pageIncidents = result.getContent();
+        List<String> incidentIds = pageIncidents.stream().map(incident -> incident.id).toList();
+        Map<String, List<ResponseEventDto>> responseEventsByIncident = new HashMap<>();
+        if (!incidentIds.isEmpty()) {
+            responseEventRepository.findByIncidentIdsOrderByTimestampDesc(incidentIds).forEach(responseEvent -> {
+                String incidentId = responseEvent.incident.id;
+                responseEventsByIncident.computeIfAbsent(incidentId, ignored -> new ArrayList<>())
+                        .add(mapper.toResponseEventDto(responseEvent));
+            });
+        }
+        List<IncidentDto> dtos = pageIncidents.stream().map(incident -> {
+            IncidentDto dto = mapper.toDto(incident);
+            dto.responseEvents = responseEventsByIncident.getOrDefault(dto.id, List.of());
+            return dto;
+        }).toList();
 
         return new PageDto<>(dtos, result.getNumber(), result.getSize(), result.getTotalElements());
     }
@@ -161,6 +178,7 @@ public class IncidentService {
                 .stream().map(mapper::toAnnotationDto).toList();
         detail.responseEvents = responseEventRepository.findByIncidentIdOrderByTimestampDesc(incident.id)
                 .stream().map(mapper::toResponseEventDto).toList();
+        dto.responseEvents = detail.responseEvents;
         detail.evidence = evidenceRepository.findByIncidentId(incident.id)
                 .stream().map(mapper::toEvidenceDto).toList();
         dto.detail = detail;

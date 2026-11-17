@@ -1,11 +1,11 @@
 # SIP — Master Context
 
-**Problem statement / project title:** An AI-Powered Safety Device  
-**System name:** SIP Guardian  
-**Project owner / team lead:** B C H Benjamin  
-**Institution:** Atria Institute of Technology, Bengaluru, Karnataka, India  
-**Repository:** https://github.com/bchbenjamin/SIP  
-**Context reviewed:** 22 October 2026  
+**Problem statement / project title:** An AI-Powered Safety Device
+**System name:** SIP Guardian
+**Project owner / team lead:** B C H Benjamin
+**Institution:** Atria Institute of Technology, Bengaluru, Karnataka, India
+**Repository:** https://github.com/bchbenjamin/SIP
+**Context reviewed:** 17 November 2026
 **Current repository branch reviewed:** `main`
 
 > This file is the concise, current entry point for future development and for Benjamin's academic reference. It separates repository evidence from planned capabilities and unverified deployment/device state. Historical academic material is summarized in the appendix; detailed runbooks remain in their dedicated documents. Never place secrets or live credentials here.
@@ -449,3 +449,10 @@ For each college report, use **“An AI-Powered Safety Device”** as the curren
 ---
 
 **Maintenance note:** This document was revised from the supplied edited context on 22 October 2026 to use the official problem statement **“An AI-Powered Safety Device”** and include a scalable Mermaid master architecture. It was inspected against the SIP repository tree and selected source files on 22 October 2026. It was not a local clone/build, a full automated test run, a Pi login, a production database check, or a complete live deployment test. Update implementation labels only after performing those checks.
+
+
+## 9. AWARESPAN Pi Deterrence Response Persistence — 17 November 2026
+
+The Pi-to-backend incident contract is being extended with a `deterrence` object. The intended flow is: Pi reports the actual playback attempt/result and selected pitch → backend persists an attempted deterrence as a `DETERRENCE` `response_events` row associated with the incident → incident list/detail DTOs and the live incident WebSocket event expose the response event → Android displays the Pi-reported result. Telegram is diagnostic only; it is not the product delivery path.
+
+Current uncommitted backend source changes touch `PiIncidentPayload`, `IncidentDto`, `PiIncidentIngestionService`, `IncidentService` and `ResponseEventRepository`. They have **not** been compiled or integration-tested in this Box because the backend Gradle wrapper JAR is absent. Verify the entity relationship, DTO serialization, transaction/after-commit broadcast, pagination query, MQTT and REST ingestion against the actual database before release. Do not mark this as deployed.

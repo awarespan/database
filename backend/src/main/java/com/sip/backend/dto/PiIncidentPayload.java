@@ -22,6 +22,7 @@ public class PiIncidentPayload {
     private Integer tier;
     private String detectionDomain;
     private String syncStatus;
+    private Map<String, Object> deterrence;
 
     public PiIncidentPayload() {}
 
@@ -59,4 +60,6 @@ public class PiIncidentPayload {
     public void setDetectionDomain(String detectionDomain) { this.detectionDomain = detectionDomain; }
     public String getSyncStatus() { return syncStatus; }
     public void setSyncStatus(String syncStatus) { this.syncStatus = syncStatus; }
+    public Map<String, Object> getDeterrence() { return deterrence; }
+    public void setDeterrence(Map<String, Object> deterrence) { this.deterrence = deterrence; }
 }
