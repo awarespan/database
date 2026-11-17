@@ -49,7 +49,8 @@ public class ApiKeyAuthFilter extends OncePerRequestFilter {
         String method = request.getMethod();
 
         // Check if this is a device-facing endpoint
-        boolean isDeviceEndpoint = 
+        boolean isDeviceEndpoint =
+            ("POST".equalsIgnoreCase(method) && "/api/v1/nodes".equals(path)) ||
             (path.startsWith("/api/v1/nodes/") && path.endsWith("/heartbeat")) ||
             ("POST".equalsIgnoreCase(method) && path.startsWith("/api/v1/incidents")) ||
             path.startsWith("/api/v1/commands/") ||

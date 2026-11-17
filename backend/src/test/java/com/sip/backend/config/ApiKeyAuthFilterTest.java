@@ -1,0 +1,33 @@
+package com.sip.backend.config;
+
+import com.sip.backend.service.PiAuthenticationService;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.mock.web.MockHttpServletResponse;
+import org.springframework.mock.web.MockFilterChain;
+import org.springframework.security.core.context.SecurityContextHolder;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.mock;
+
+class ApiKeyAuthFilterTest {
+    @AfterEach
+    void clearSecurityContext() { SecurityContextHolder.clearContext(); }
+
+    @Test
+    void globalDeviceApiKeyCanBootstrapNodeRegistration() throws Exception {
+        ApiKeyAuthFilter filter = new ApiKeyAuthFilter("ci-device-key", mock(PiAuthenticationService.class));
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/v1/nodes");
+        request.addHeader("X-API-Key", "ci-device-key");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        MockFilterChain chain = new MockFilterChain();
+
+        filter.doFilter(request, response, chain);
+
+        assertNotNull(chain.getRequest());
+        assertEquals(200, response.getStatus());
+        assertTrue(SecurityContextHolder.getContext().getAuthentication().getAuthorities().stream()
+                .anyMatch(authority -> authority.getAuthority().equals("ROLE_DEVICE")));
+    }
+}
