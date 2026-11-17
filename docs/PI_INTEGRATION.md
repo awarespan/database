@@ -145,7 +145,8 @@ event_queue.stop()
   ],
   "tier": 1,
   "detectionDomain": "ANIMAL",
-  "syncStatus": "PENDING"
+  "syncStatus": "PENDING",
+  "deterrence": {"attempted": false, "started": false, "reason": "not_requested"}
 }
 ```
 
@@ -214,3 +215,8 @@ echo "PI_DEVICE_SECRET=$PI_DEVICE_SECRET" >> ~/edge-ai/.env
 # Never commit .env to git
 echo ".env" >> ~/.gitignore_global
 ```
+### Authentication and detection persistence
+
+The node must send `X-Node-Id` and `X-Device-Secret` matching a node already registered in the backend, or send the configured global `X-API-Key` as a bootstrap credential. The Pi installer does not register nodes automatically. Register the node before first REST delivery, or configure the global device API key on both sides. Keep the device secret and API key out of source control.
+
+Each Pi incident includes a `detections` array containing the individual model labels and confidence values. The backend stores the combined labels in `detection_results.predicted_class` and the original array in `detection_results.raw_scores`; Android receives the incident and any response events through `/api/v1/incidents` and the `INCIDENT_NEW` WebSocket event. The Pi's MQTT client waits for the backend application ACK (sent after ingestion returns) before treating the incident as delivered, then falls back to REST if no ACK arrives.

@@ -24,6 +24,7 @@ import java.util.UUID;
 public class PiIncidentIngestionService {
 
     private static final Logger log = LoggerFactory.getLogger(PiIncidentIngestionService.class);
+    private static final com.fasterxml.jackson.databind.ObjectMapper JSON = new com.fasterxml.jackson.databind.ObjectMapper();
 
     private final IncidentRepository incidentRepository;
     private final DetectionResultRepository detectionResultRepository;
@@ -109,12 +110,21 @@ public class PiIncidentIngestionService {
             DetectionResult dr = new DetectionResult();
             dr.id = UUID.randomUUID().toString();
             dr.incident = incident;
-            dr.predictedClass = payload.getThreatType();
+            dr.predictedClass = payload.getDetections() != null && !payload.getDetections().isEmpty()
+                    ? payload.getDetections().stream()
+                        .map(detection -> String.valueOf(detection.getOrDefault("label", "unknown")))
+                        .distinct().collect(java.util.stream.Collectors.joining(","))
+                    : payload.getThreatType();
             dr.confidence = payload.getConfidence();
             dr.modelVersion = payload.getModelVersion();
             dr.detectionTimestamp = incident.createdAt;
-            dr.sensorModalities = null;
-            dr.rawScores = null;
+            dr.sensorModalities = "[\"visual\"]";
+            try {
+                dr.rawScores = payload.getDetections() != null
+                        ? JSON.writeValueAsString(payload.getDetections()) : null;
+            } catch (com.fasterxml.jackson.core.JsonProcessingException serializationError) {
+                throw new IllegalArgumentException("Unable to serialize detection results", serializationError);
+            }
             detectionResultRepository.save(dr);
         }
 
@@ -154,6 +164,8 @@ public class PiIncidentIngestionService {
         if (broadcaster != null && mapper != null) {
             try {
                 var incidentDto = mapper.toDto(incident);
+                incidentDto.detection = detectionResultRepository.findByIncidentId(incident.id)
+                        .map(mapper::toDetectionDto).orElse(null);
                 if (deterrenceEvent != null) {
                     incidentDto.responseEvents = java.util.List.of(mapper.toResponseEventDto(deterrenceEvent));
                 }
