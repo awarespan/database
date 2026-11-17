@@ -1,6 +1,8 @@
 package com.sip.backend.entity;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import java.time.OffsetDateTime;
 
 @Entity
@@ -25,9 +27,11 @@ public class DetectionResult {
     @Column(name = "detection_timestamp", nullable = false)
     public OffsetDateTime detectionTimestamp;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "sensor_modalities", columnDefinition = "jsonb")
     public String sensorModalities;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "raw_scores", columnDefinition = "jsonb")
     public String rawScores;
 
