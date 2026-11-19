@@ -1,6 +1,8 @@
 package com.sip.backend.controller;
 
 import com.sip.backend.dto.NodeDto;
+import com.sip.backend.dto.NodeEnrollmentRequest;
+import com.sip.backend.dto.NodeEnrollmentResponse;
 import com.sip.backend.dto.NodeHeartbeatPayload;
 import com.sip.backend.entity.Node;
 import com.sip.backend.entity.NodeHeartbeat;
@@ -27,33 +29,19 @@ public class NodeController {
     }
 
     @GetMapping
-    public ResponseEntity<?> listNodes(@RequestParam(required = false) String format) {
-        if ("dto".equalsIgnoreCase(format)) {
-            return ResponseEntity.ok(piNodeService.getAllNodes());
-        }
-        return ResponseEntity.ok(nodeRepository.findAll());
+    public ResponseEntity<List<NodeDto>> listNodes() {
+        // Never serialize Node entities here: they contain installation IDs and device secrets.
+        return ResponseEntity.ok(piNodeService.getAllNodes());
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<?> getNode(@PathVariable String id, @RequestParam(required = false) String format) {
-        if ("dto".equalsIgnoreCase(format)) {
-            return ResponseEntity.ok(piNodeService.getNode(id));
-        }
-        return nodeService.findById(id)
-                .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
+    public ResponseEntity<NodeDto> getNode(@PathVariable String id) {
+        return ResponseEntity.ok(piNodeService.getNode(id));
     }
 
-    @PostMapping
-    public ResponseEntity<?> registerNode(@RequestBody Node node) {
-        if (node.id == null || node.id.isBlank()) {
-            return ResponseEntity.badRequest().build();
-        }
-        if (nodeRepository.existsById(node.id)) {
-            return ResponseEntity.status(409).body("Node already registered");
-        }
-        Node saved = nodeRepository.save(node);
-        return ResponseEntity.status(201).body(saved);
+    @PostMapping("/enroll")
+    public ResponseEntity<NodeEnrollmentResponse> enrollNode(@RequestBody NodeEnrollmentRequest request) {
+        return ResponseEntity.ok(nodeService.enroll(request));
     }
 
     @PostMapping("/{id}/heartbeat")
@@ -73,7 +61,7 @@ public class NodeController {
             try {
                 node.status = Node.NodeStatus.valueOf(status.toUpperCase());
                 nodeRepository.save(node);
-                return ResponseEntity.ok(node);
+                return ResponseEntity.ok(piNodeService.toDto(node));
             } catch (IllegalArgumentException e) {
                 return ResponseEntity.badRequest().build();
             }

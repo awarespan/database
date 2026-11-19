@@ -19,7 +19,7 @@ import java.security.MessageDigest;
 import java.util.List;
 
 /**
- * Authenticates Pi edge nodes via X-API-Key or per-node X-Device-Secret/X-Node-Token.
+ * Authenticates enrollment with the global API key and routine node traffic with backend-issued per-node credentials.
  * Sets ROLE_DEVICE / ROLE_NODE in SecurityContextHolder so Spring Security authorizes the request.
  */
 @Component
@@ -50,14 +50,14 @@ public class ApiKeyAuthFilter extends OncePerRequestFilter {
 
         // Check if this is a device-facing endpoint
         boolean isDeviceEndpoint =
-            ("POST".equalsIgnoreCase(method) && "/api/v1/nodes".equals(path)) ||
+            ("POST".equalsIgnoreCase(method) && "/api/v1/nodes/enroll".equals(path)) ||
             (path.startsWith("/api/v1/nodes/") && path.endsWith("/heartbeat")) ||
             ("POST".equalsIgnoreCase(method) && path.startsWith("/api/v1/incidents")) ||
             path.startsWith("/api/v1/commands/") ||
             path.startsWith("/api/v1/media/");
 
         if (isDeviceEndpoint) {
-            // If already authenticated (e.g. by JWT earlier), proceed
+            // An already-authenticated operator JWT may access operator endpoints.
             if (SecurityContextHolder.getContext().getAuthentication() != null &&
                 SecurityContextHolder.getContext().getAuthentication().isAuthenticated()) {
                 filterChain.doFilter(request, response);
@@ -68,8 +68,30 @@ public class ApiKeyAuthFilter extends OncePerRequestFilter {
             String presentedNodeId = request.getHeader(NODE_ID_HEADER);
             String presentedDeviceSecret = request.getHeader(DEVICE_SECRET_HEADER);
             String presentedNodeToken = request.getHeader(NODE_TOKEN_HEADER);
+            boolean isEnrollment = "POST".equalsIgnoreCase(method) &&
+                    "/api/v1/nodes/enroll".equals(path);
 
-            // 1. Check per-node authentication if node headers are provided
+            // The global deployment key is strictly for enrollment, never routine telemetry.
+            if (isEnrollment) {
+                if (validApiKey != null && presentedApiKey != null &&
+                    MessageDigest.isEqual(validApiKey.getBytes(StandardCharsets.UTF_8),
+                                          presentedApiKey.getBytes(StandardCharsets.UTF_8))) {
+                    var auth = new UsernamePasswordAuthenticationToken(
+                        "ENROLLMENT",
+                        null,
+                        List.of(new SimpleGrantedAuthority("ROLE_DEVICE"), new SimpleGrantedAuthority("ROLE_NODE"))
+                    );
+                    SecurityContextHolder.getContext().setAuthentication(auth);
+                    filterChain.doFilter(request, response);
+                    return;
+                }
+                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                response.setContentType("application/json");
+                response.getWriter().write("{\"error\":\"Invalid enrollment API key\"}");
+                return;
+            }
+
+            // Routine node traffic requires the backend-issued per-node credential.
             if (presentedNodeId != null && !presentedNodeId.isBlank()) {
                 boolean authenticated = false;
                 if (presentedDeviceSecret != null && !presentedDeviceSecret.isBlank()) {
@@ -77,7 +99,6 @@ public class ApiKeyAuthFilter extends OncePerRequestFilter {
                 } else if (presentedNodeToken != null && !presentedNodeToken.isBlank()) {
                     authenticated = piAuthService.validateNodeToken(presentedNodeId, presentedNodeToken);
                 }
-
                 if (authenticated) {
                     var auth = new UsernamePasswordAuthenticationToken(
                         presentedNodeId,
@@ -88,28 +109,16 @@ public class ApiKeyAuthFilter extends OncePerRequestFilter {
                     filterChain.doFilter(request, response);
                     return;
                 }
+                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                response.setContentType("application/json");
+                response.getWriter().write("{\"error\":\"Invalid node credential\"}");
+                return;
             }
 
-            // 2. Check global device API key
-            if (validApiKey != null && presentedApiKey != null && !presentedApiKey.isBlank()) {
-                if (MessageDigest.isEqual(validApiKey.getBytes(StandardCharsets.UTF_8),
-                                          presentedApiKey.getBytes(StandardCharsets.UTF_8))) {
-                    var auth = new UsernamePasswordAuthenticationToken(
-                        "DEVICE",
-                        null,
-                        List.of(new SimpleGrantedAuthority("ROLE_DEVICE"), new SimpleGrantedAuthority("ROLE_NODE"))
-                    );
-                    SecurityContextHolder.getContext().setAuthentication(auth);
-                    filterChain.doFilter(request, response);
-                    return;
-                }
-            }
-
-            // If neither authentication method matched, check if an API key was presented and invalid
             if (presentedApiKey != null && !presentedApiKey.isBlank()) {
                 response.setStatus(HttpServletResponse.SC_FORBIDDEN);
                 response.setContentType("application/json");
-                response.getWriter().write("{\"error\":\"Invalid API key\"}");
+                response.getWriter().write("{\"error\":\"Global API key is enrollment-only\"}");
                 return;
             }
         }

@@ -51,7 +51,8 @@ public class PiAuthenticationService {
         Optional<Node> nodeOpt = nodeRepository.findById(nodeId);
         if (nodeOpt.isEmpty()) return false;
         Node node = nodeOpt.get();
-        String deviceSecret = node.deviceSecret != null ? node.deviceSecret : nodeId;
+        String deviceSecret = node.deviceSecret;
+        if (deviceSecret == null || deviceSecret.isBlank()) return false;
         Optional<String> expectedToken = deriveNodeCredential(nodeId, deviceSecret);
         return expectedToken.map(t ->
             MessageDigest.isEqual(t.getBytes(StandardCharsets.UTF_8), presentedToken.getBytes(StandardCharsets.UTF_8))
@@ -67,7 +68,8 @@ public class PiAuthenticationService {
         Optional<Node> nodeOpt = nodeRepository.findById(nodeId);
         if (nodeOpt.isEmpty()) return false;
         Node node = nodeOpt.get();
-        String storedSecret = node.deviceSecret != null ? node.deviceSecret : nodeId;
+        String storedSecret = node.deviceSecret;
+        if (storedSecret == null || storedSecret.isBlank()) return false;
         return MessageDigest.isEqual(
                 storedSecret.getBytes(StandardCharsets.UTF_8),
                 rawSecret.getBytes(StandardCharsets.UTF_8)

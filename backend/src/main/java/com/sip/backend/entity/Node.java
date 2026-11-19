@@ -31,6 +31,9 @@ public class Node {
     @Column(name = "device_secret")
     public String deviceSecret;
 
+    @Column(name = "installation_id", unique = true)
+    public String installationId;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     public OffsetDateTime createdAt;
 

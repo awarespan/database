@@ -57,8 +57,8 @@ BACKEND_API_URL=https://your-backend.railway.app
 BACKEND_API_KEY=your-device-api-key
 
 # Pi identity (must match what's registered in the backend)
-PI_NODE_ID=sip-pi-001
-PI_DEVICE_SECRET=change-me
+# PI_NODE_ID is assigned by the backend during enrollment; do not set it manually.
+# PI_DEVICE_SECRET is issued by the backend during enrollment; do not set it manually.
 
 # Telegram (optional)
 BOT_TOKEN=your-telegram-bot-token
@@ -220,3 +220,8 @@ echo ".env" >> ~/.gitignore_global
 The node must send `X-Node-Id` and `X-Device-Secret` matching a node already registered in the backend, or send the configured global `X-API-Key` as a bootstrap credential. The Pi installer does not register nodes automatically. Register the node before first REST delivery, or configure the global device API key on both sides. Keep the device secret and API key out of source control.
 
 Each Pi incident includes a `detections` array containing the individual model labels and confidence values. The backend stores the combined labels in `detection_results.predicted_class` and the original array in `detection_results.raw_scores`; Android receives the incident and any response events through `/api/v1/incidents` and the `INCIDENT_NEW` WebSocket event. The Pi's MQTT client waits for the backend application ACK (sent after ingestion returns) before treating the incident as delivered, then falls back to REST if no ACK arrives.
+
+
+## Backend-owned node enrollment
+
+Before deploying this backend version, apply `backend/src/main/resources/db/migration/V9__backend_owned_node_enrollment.sql` to the production database. Nodes enroll with `POST /api/v1/nodes/enroll` using the global `DEVICE_API_KEY` and a persistent, locally generated installation UUID. The backend returns the public `nodeId`, display `name`, and a random per-node `deviceSecret`. The node persists those returned values; it never chooses its public ID or display name. Subsequent heartbeat and incident requests authenticate with `X-Node-Id` and `X-Device-Secret`, not the global API key. Unknown node IDs are rejected rather than auto-registered.

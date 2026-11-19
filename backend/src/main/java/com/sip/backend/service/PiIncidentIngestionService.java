@@ -65,15 +65,7 @@ public class PiIncidentIngestionService {
 
         // Validate or auto-register node
         Node node = nodeRepository.findById(payload.getNodeId())
-                .orElseGet(() -> {
-                    Node newNode = new Node();
-                    newNode.id = payload.getNodeId();
-                    newNode.name = "Raspberry Pi (" + payload.getNodeId() + ")";
-                    newNode.status = Node.NodeStatus.ONLINE;
-                    newNode.deviceSecret = payload.getNodeId();
-                    log.info("Auto-registered new node on incident ingestion: {}", payload.getNodeId());
-                    return nodeRepository.save(newNode);
-                });
+                .orElseThrow(() -> new IllegalArgumentException("Node is not enrolled: " + payload.getNodeId()));
 
         int tier = payload.getTier() != null ? payload.getTier() : 0;
 
