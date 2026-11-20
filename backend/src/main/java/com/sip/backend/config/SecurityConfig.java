@@ -66,7 +66,20 @@ public class SecurityConfig {
         if (origins.isEmpty()) {
             config.setAllowedOriginPatterns(List.of("*"));
         } else {
+            // Keep the configured public web origins, but also permit the local
+            // HTTPS origins used by the volunteer portal on a private LAN.
+            // These patterns are deliberately limited to local hostnames and
+            // RFC1918 addresses rather than opening production CORS to every site.
             config.setAllowedOrigins(origins);
+            config.setAllowedOriginPatterns(List.of(
+                "https://*.local:*",
+                "https://192.168.*:*",
+                "https://10.*:*",
+                "https://172.16.*:*",
+                "https://172.17.*:*",
+                "http://localhost:*",
+                "http://127.0.0.1:*"
+            ));
         }
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
         config.setAllowedHeaders(List.of("*"));
