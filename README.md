@@ -67,12 +67,14 @@ The backend runs on port **8080** by default.
 
 ## Database Migrations
 
-Migrations live in `src/main/resources/db/migration/`. They run automatically on startup.
+Migrations live in `backend/src/main/resources/db/migration/`. The production application configuration currently disables automatic Flyway execution; apply each new SQL migration to the target database before deploying the matching backend revision. See `docs/DEPLOYMENT.md` and `docs/PI_INTEGRATION.md`.
 
 | Migration | Description |
 |-----------|-------------|
-| `V1__initial_schema.sql` | Core tables: users, nodes, incidents, detections, etc. |
-| `V6__enhanced_schema.sql` | Pi integration: heartbeats, command queue, datasets, training runs |
+| `V1__initial_schema.sql` | Core tables: users, nodes, incidents, detections, evidence, etc. |
+| `V6__enhanced_schema.sql` | Edge integration: heartbeats, command queue, datasets, training runs |
+| `V9__backend_owned_node_enrollment.sql` | Backend-owned node identity and per-node device credentials |
+| `V10__store_evidence_media_bytes.sql` | PostgreSQL `bytea` storage for annotated image evidence |
 
 ## API Reference
 

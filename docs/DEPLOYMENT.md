@@ -84,6 +84,10 @@ fly deploy
 fly ips show
 ```
 
+## Database migrations
+
+The current production application configuration has Flyway auto-execution disabled. Apply the versioned SQL migration to the target PostgreSQL database before deploying backend code that depends on it. For the Telegram annotated-image path, apply `backend/src/main/resources/db/migration/V10__store_evidence_media_bytes.sql` (adds `evidence.media_data BYTEA`) using the database provider SQL editor or an authenticated `psql` session. Verify the column exists before deploying the backend revision. Do not rely on the Java entity alone to alter a production schema.
+
 ## Environment Setup Checklist
 
 ### Backend (.env)
