@@ -4,6 +4,9 @@ import com.sip.backend.dto.IncidentDto;
 import com.sip.backend.dto.PiIncidentPayload;
 import com.sip.backend.entity.Node;
 import com.sip.backend.incident.IncidentService;
+import com.sip.backend.evidence.EvidenceService;
+import com.sip.backend.entity.Evidence;
+import org.springframework.core.io.ByteArrayResource;
 import com.sip.backend.repository.DetectionResultRepository;
 import com.sip.backend.repository.IncidentRepository;
 import com.sip.backend.repository.NodeRepository;
@@ -30,6 +33,7 @@ class PiIncidentPipelineIntegrationTest {
     @Autowired IncidentRepository incidentRepository;
     @Autowired DetectionResultRepository detectionRepository;
     @Autowired ResponseEventRepository responseEventRepository;
+    @Autowired EvidenceService evidenceService;
 
     @Test
     void ingestsPiDetectionPersistsLabelsAndResponseAndReturnsAndroidDto() {
@@ -76,4 +80,42 @@ class PiIncidentPipelineIntegrationTest {
         assertTrue(androidDto.responseEvents.get(0).result.contains("STARTED"));
         assertTrue(androidDto.responseEvents.get(0).result.contains("987Hz"));
     }
+    @Test
+    void telegramTestIncidentStoresAnnotatedImageAndReturnsAndroidEvidenceUrl() {
+        Node node = new Node();
+        node.id = "telegram-test-node";
+        node.name = "Telegram test node";
+        node.status = Node.NodeStatus.ONLINE;
+        node.deviceSecret = "integration-secret";
+        nodeRepository.save(node);
+
+        PiIncidentPayload payload = new PiIncidentPayload();
+        payload.setIncidentId("telegram-test-incident-01");
+        payload.setIdempotencyKey("telegram-test-incident-01");
+        payload.setNodeId(node.id);
+        payload.setDetectionTime(Instant.parse("2026-11-20T03:00:00Z"));
+        payload.setThreatType("WEAPON");
+        payload.setThreatSeverity("HIGH");
+        payload.setThreatDescription("TEST — submitted through the Telegram bot; not a live sensor event. Detected gun");
+        payload.setConfidence(0.91);
+        payload.setModelVersion("telegram-test:yolov8n_best_weapon.pt");
+        payload.setTier(2);
+        payload.setDetectionDomain("WEAPON");
+        payload.setDetections(List.of(Map.of("label", "gun", "confidence", 0.91)));
+
+        // A valid minimal JPEG signature followed by payload bytes is sufficient for MIME validation.
+        byte[] jpeg = new byte[] {(byte) 0xff, (byte) 0xd8, (byte) 0xff, 0x01, 0x02, 0x03};
+        ingestionService.ingestIncidentWithEvidence(payload, jpeg, "image/jpeg", node.id);
+
+        IncidentDto androidDto = incidentService.getIncident(payload.getIncidentId());
+        assertEquals(1, androidDto.detail.evidence.size());
+        assertEquals("/api/v1/evidence/telegram-test-incident-01/image", androidDto.detail.evidence.get(0).imageUrl);
+        assertEquals("UPLOADED", androidDto.detail.evidence.get(0).uploadStatus);
+        var media = evidenceService.getEvidenceMedia(payload.getIncidentId(), Evidence.EvidenceType.IMAGE);
+        assertEquals(200, media.getStatusCode().value());
+        assertEquals(jpeg.length, media.getHeaders().getContentLength());
+        assertArrayEquals(jpeg, ((ByteArrayResource) media.getBody()).getByteArray());
+        assertTrue(androidDto.threatDescription.startsWith("TEST — submitted through the Telegram bot"));
+    }
+
 }

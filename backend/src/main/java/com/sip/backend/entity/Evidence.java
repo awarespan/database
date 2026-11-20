@@ -20,6 +20,10 @@ public class Evidence {
     @Column(name = "storage_key")
     public String storageKey;
 
+    // PostgreSQL bytea keeps the small annotated JPEG evidence self-contained.
+    @Column(name = "media_data", columnDefinition = "bytea")
+    public byte[] mediaData;
+
     @Column(name = "mime_type")
     public String mimeType;
 

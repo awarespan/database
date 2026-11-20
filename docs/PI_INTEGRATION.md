@@ -225,3 +225,8 @@ Each Pi incident includes a `detections` array containing the individual model l
 ## Backend-owned node enrollment
 
 Before deploying this backend version, apply `backend/src/main/resources/db/migration/V9__backend_owned_node_enrollment.sql` to the production database. Nodes enroll with `POST /api/v1/nodes/enroll` using the global `DEVICE_API_KEY` and a persistent, locally generated installation UUID. The backend returns the public `nodeId`, display `name`, and a random per-node `deviceSecret`. The node persists those returned values; it never chooses its public ID or display name. Subsequent heartbeat and incident requests authenticate with `X-Node-Id` and `X-Device-Secret`, not the global API key. Unknown node IDs are rejected rather than auto-registered.
+
+
+### Annotated evidence uploads
+
+The optional Telegram photo-test path uses `POST /api/v1/incidents/with-evidence` with a JSON `payload` part and annotated image `file` part. The endpoint requires the backend-issued `X-Node-Id` and `X-Device-Secret`, validates that the incident belongs to that node, and stores JPEG/PNG/WebP bytes in PostgreSQL `bytea` before broadcasting the incident to Android. Apply `V10__store_evidence_media_bytes.sql` before deploying this version. The Android app retrieves image bytes using its authenticated `GET /api/v1/evidence/{incidentId}/image` call. Telegram submissions are labelled as tests and never trigger node deterrence.

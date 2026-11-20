@@ -12,8 +12,11 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.MediaType;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
+import org.springframework.web.multipart.MultipartFile;
+import java.io.IOException;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
@@ -41,6 +44,22 @@ public class IncidentController {
     public ResponseEntity<?> ingestIncident(@RequestBody PiIncidentPayload payload) {
         try {
             Incident incident = ingestionService.ingestIncident(payload);
+            return ResponseEntity.status(201).body(mapper.toDto(incident));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    // Atomically persist a Telegram/operator test incident and its annotated image.
+    @PostMapping(value = "/with-evidence", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasAnyRole('DEVICE', 'NODE')")
+    public ResponseEntity<?> ingestIncidentWithEvidence(
+            @RequestPart("payload") PiIncidentPayload payload,
+            @RequestPart("file") MultipartFile file,
+            Authentication authentication) throws IOException {
+        try {
+            Incident incident = ingestionService.ingestIncidentWithEvidence(
+                    payload, file.getBytes(), file.getContentType(), authentication.getName());
             return ResponseEntity.status(201).body(mapper.toDto(incident));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(e.getMessage());

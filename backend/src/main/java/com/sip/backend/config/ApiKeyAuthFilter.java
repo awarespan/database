@@ -53,6 +53,7 @@ public class ApiKeyAuthFilter extends OncePerRequestFilter {
             ("POST".equalsIgnoreCase(method) && "/api/v1/nodes/enroll".equals(path)) ||
             (path.startsWith("/api/v1/nodes/") && path.endsWith("/heartbeat")) ||
             ("POST".equalsIgnoreCase(method) && path.startsWith("/api/v1/incidents")) ||
+            ("POST".equalsIgnoreCase(method) && path.startsWith("/api/v1/evidence/")) ||
             path.startsWith("/api/v1/commands/") ||
             path.startsWith("/api/v1/media/");
 

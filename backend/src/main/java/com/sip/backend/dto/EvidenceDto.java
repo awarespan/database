@@ -7,6 +7,10 @@ public class EvidenceDto {
     public String incidentId;
     public String type;
     public String storageKey;
+    public String imageUrl;
+    public String videoUrl;
+    public String audioUrl;
+    public String thumbnailUrl;
     public String mimeType;
     public Long sizeBytes;
     public String sha256;

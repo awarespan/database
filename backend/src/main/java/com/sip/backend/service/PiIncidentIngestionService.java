@@ -1,6 +1,8 @@
 package com.sip.backend.service;
 
 import com.sip.backend.dto.PiIncidentPayload;
+import com.sip.backend.dto.IncidentDetailDto;
+import com.sip.backend.evidence.EvidenceService;
 import com.sip.backend.entity.DetectionResult;
 import com.sip.backend.entity.Incident;
 import com.sip.backend.entity.Incident.*;
@@ -32,20 +34,35 @@ public class PiIncidentIngestionService {
     private final ResponseEventRepository responseEventRepository;
     private final com.sip.backend.realtime.WebSocketBroadcaster broadcaster;
     private final com.sip.backend.incident.IncidentMapper mapper;
+    private final EvidenceService evidenceService;
 
+    @org.springframework.beans.factory.annotation.Autowired
     public PiIncidentIngestionService(
             IncidentRepository incidentRepository,
             DetectionResultRepository detectionResultRepository,
             NodeRepository nodeRepository,
             ResponseEventRepository responseEventRepository,
+            EvidenceService evidenceService,
             @org.springframework.beans.factory.annotation.Autowired(required = false) com.sip.backend.realtime.WebSocketBroadcaster broadcaster,
             @org.springframework.beans.factory.annotation.Autowired(required = false) com.sip.backend.incident.IncidentMapper mapper) {
         this.incidentRepository = incidentRepository;
         this.detectionResultRepository = detectionResultRepository;
         this.nodeRepository = nodeRepository;
         this.responseEventRepository = responseEventRepository;
+        this.evidenceService = evidenceService;
         this.broadcaster = broadcaster;
         this.mapper = mapper;
+    }
+
+    // Compatibility constructor for focused unit tests that exercise metadata-only ingestion.
+    PiIncidentIngestionService(IncidentRepository incidentRepository,
+                               DetectionResultRepository detectionResultRepository,
+                               NodeRepository nodeRepository,
+                               ResponseEventRepository responseEventRepository,
+                               com.sip.backend.realtime.WebSocketBroadcaster broadcaster,
+                               com.sip.backend.incident.IncidentMapper mapper) {
+        this(incidentRepository, detectionResultRepository, nodeRepository, responseEventRepository,
+                null, broadcaster, mapper);
     }
 
     /**
@@ -54,6 +71,23 @@ public class PiIncidentIngestionService {
      */
     @Transactional
     public Incident ingestIncident(PiIncidentPayload payload) {
+        Incident incident = persistIncident(payload);
+        broadcastIncident(incident, false);
+        return incident;
+    }
+
+    /** Ingest metadata and annotated image atomically, then broadcast only the complete incident. */
+    @Transactional
+    public Incident ingestIncidentWithEvidence(PiIncidentPayload payload, byte[] imageBytes,
+                                               String mimeType, String authenticatedNodeId) {
+        if (evidenceService == null) throw new IllegalStateException("Evidence storage is unavailable");
+        Incident incident = persistIncident(payload);
+        evidenceService.uploadImage(incident.id, imageBytes, mimeType, authenticatedNodeId);
+        broadcastIncident(incident, true);
+        return incident;
+    }
+
+    private Incident persistIncident(PiIncidentPayload payload) {
         // Idempotency check
         if (payload.getIdempotencyKey() != null && !payload.getIdempotencyKey().isBlank()) {
             Optional<Incident> existing = incidentRepository.findByIdempotencyKey(payload.getIdempotencyKey());
@@ -153,37 +187,45 @@ public class PiIncidentIngestionService {
         log.info("Ingested incident {} from node {} tier={} domain={}",
                 incident.id, payload.getNodeId(), tier, payload.getDetectionDomain());
 
-        if (broadcaster != null && mapper != null) {
-            try {
-                var incidentDto = mapper.toDto(incident);
-                incidentDto.detection = detectionResultRepository.findByIncidentId(incident.id)
-                        .map(mapper::toDetectionDto).orElse(null);
-                if (deterrenceEvent != null) {
-                    incidentDto.responseEvents = java.util.List.of(mapper.toResponseEventDto(deterrenceEvent));
-                }
-                String broadcastIncidentId = incident.id;
-                Runnable broadcast = () -> {
-                    try {
-                        broadcaster.broadcastIncidentNew(incidentDto);
-                        log.info("Broadcasted committed incident {} to websocket clients", broadcastIncidentId);
-                    } catch (Exception broadcastError) {
-                        log.warn("Failed to broadcast committed incident {}: {}", broadcastIncidentId, broadcastError.getMessage());
-                    }
-                };
-                if (org.springframework.transaction.support.TransactionSynchronizationManager.isSynchronizationActive()) {
-                    org.springframework.transaction.support.TransactionSynchronizationManager.registerSynchronization(
-                            new org.springframework.transaction.support.TransactionSynchronization() {
-                                @Override public void afterCommit() { broadcast.run(); }
-                            });
-                } else {
-                    broadcast.run();
-                }
-            } catch (Exception e) {
-                log.warn("Failed to broadcast real-time incident {}: {}", incident.id, e.getMessage());
-            }
-        }
-
         return incident;
+    }
+
+    private void broadcastIncident(Incident incident, boolean includeEvidence) {
+        if (broadcaster == null || mapper == null) return;
+        try {
+            var incidentDto = mapper.toDto(incident);
+            incidentDto.detection = detectionResultRepository.findByIncidentId(incident.id)
+                    .map(mapper::toDetectionDto).orElse(null);
+            var responses = responseEventRepository.findByIncidentIdOrderByTimestampDesc(incident.id)
+                    .stream().map(mapper::toResponseEventDto).toList();
+            incidentDto.responseEvents = responses;
+            if (includeEvidence) {
+                IncidentDetailDto detail = new IncidentDetailDto();
+                detail.responseEvents = responses;
+                detail.evidence = evidenceService.getEvidenceForIncident(incident.id)
+                        .stream().map(mapper::toEvidenceDto).toList();
+                incidentDto.detail = detail;
+            }
+            String broadcastIncidentId = incident.id;
+            Runnable broadcast = () -> {
+                try {
+                    broadcaster.broadcastIncidentNew(incidentDto);
+                    log.info("Broadcasted committed incident {} to websocket clients", broadcastIncidentId);
+                } catch (Exception broadcastError) {
+                    log.warn("Failed to broadcast committed incident {}: {}", broadcastIncidentId, broadcastError.getMessage());
+                }
+            };
+            if (org.springframework.transaction.support.TransactionSynchronizationManager.isSynchronizationActive()) {
+                org.springframework.transaction.support.TransactionSynchronizationManager.registerSynchronization(
+                        new org.springframework.transaction.support.TransactionSynchronization() {
+                            @Override public void afterCommit() { broadcast.run(); }
+                        });
+            } else {
+                broadcast.run();
+            }
+        } catch (Exception e) {
+            log.warn("Failed to prepare real-time incident {}: {}", incident.id, e.getMessage());
+        }
     }
 
     private ThreatType parseThreatType(String s) {

@@ -80,6 +80,15 @@ public class IncidentMapper {
         dto.incidentId = e.incident != null ? e.incident.id : null;
         dto.type = e.type.name();
         dto.storageKey = e.storageKey;
+        if (e.incident != null && e.type != null) {
+            String base = "/api/v1/evidence/" + e.incident.id + "/";
+            switch (e.type) {
+                case IMAGE -> dto.imageUrl = base + "image";
+                case VIDEO -> dto.videoUrl = base + "video";
+                case AUDIO -> dto.audioUrl = base + "audio";
+                case THUMBNAIL -> dto.thumbnailUrl = base + "thumbnail";
+            }
+        }
         dto.mimeType = e.mimeType;
         dto.sizeBytes = e.sizeBytes;
         dto.sha256 = e.sha256;

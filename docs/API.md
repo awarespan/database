@@ -48,16 +48,18 @@ Accepts an optional `{"refreshToken":"<opaque-refresh-token>"}` body. When suppl
 | GET | `/api/v1/incidents?page=0&size=50` | Paginated incident feed; optional `state`, `threatType`, `nodeId`, `from`, `to` filters |
 | GET | `/api/v1/incidents/{id}` | Incident detail |
 | POST | `/api/v1/incidents/{id}/verify` | Operator annotation and lifecycle update |
+| POST | `/api/v1/incidents/with-evidence` | Node-only multipart ingestion of an incident plus annotated image; persists both before broadcasting |
 | GET | `/api/v1/incidents/{id}/events` | Incident audit events |
 | GET | `/api/v1/nodes` | Node list |
 | GET | `/api/v1/nodes/{id}` | Node details |
 | GET | `/api/v1/dashboard` | Dashboard summary |
 | GET | `/api/v1/autopilot/policy?nodeId={id}` | Read policy |
 | PUT | `/api/v1/autopilot/policy?nodeId={id}` | Update policy; ADMIN only |
-| GET | `/api/v1/evidence/{incidentId}/image` | Image media endpoint (returns 501 until storage provider is configured) |
-| GET | `/api/v1/evidence/{incidentId}/video` | Video media endpoint (returns 501 until storage provider is configured) |
-| GET | `/api/v1/evidence/{incidentId}/audio` | Audio media endpoint (returns 501 until storage provider is configured) |
-| GET | `/api/v1/evidence/{incidentId}/thumbnail` | Thumbnail endpoint (returns 501 until storage provider is configured) |
+| POST | `/api/v1/evidence/{incidentId}/image` | Node-only multipart upload (`file` part, JPEG/PNG/WebP, max 10 MB) |
+| GET | `/api/v1/evidence/{incidentId}/image` | Authenticated image media stream from PostgreSQL `bytea` |
+| GET | `/api/v1/evidence/{incidentId}/video` | Video media endpoint (not implemented) |
+| GET | `/api/v1/evidence/{incidentId}/audio` | Audio media endpoint (not implemented) |
+| GET | `/api/v1/evidence/{incidentId}/thumbnail` | Thumbnail media endpoint (not implemented) |
 
 Verification request:
 
@@ -80,3 +82,9 @@ Known event types include `INCIDENT_NEW`, `INCIDENT_UPDATED`, `NODE_STATUS_CHANG
 ## Error format
 
 Errors include HTTP status, a stable code, a safe message, request path and request ID. Do not rely on exception details being exposed to clients.
+
+### Telegram photo test ingestion
+
+The optional Telegram operator bot sends a classified photo test as one multipart request to `POST /api/v1/incidents/with-evidence`. The request contains a JSON `payload` part and an annotated JPEG `file` part. The backend verifies the per-node credential, verifies that the incident belongs to that node, persists incident metadata and image bytes in one transaction, then broadcasts `INCIDENT_NEW`. The threat description is explicitly prefixed `TEST — submitted through the Telegram bot; not a live sensor event.` No deterrence action is invoked for these test submissions. Android downloads the image through the authenticated `GET /api/v1/evidence/{incidentId}/image` endpoint.
+
+The backend enforces a 10 MB image limit and accepts JPEG, PNG, and WebP. Apply migration `V10__store_evidence_media_bytes.sql` before deploying this backend version. Video/audio storage remains unimplemented.

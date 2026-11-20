@@ -50,7 +50,7 @@ public class SecurityConfig {
                 .requestMatchers("/", "/health", "/healthz", "/ping").permitAll()
                 .requestMatchers("/ws/**").permitAll()
                 .requestMatchers("/api/v1/media/**").permitAll()
-                .requestMatchers(HttpMethod.POST, "/api/v1/nodes/enroll", "/api/v1/nodes/*/heartbeat", "/api/v1/incidents").hasAnyRole("DEVICE", "NODE", "ADMIN", "OPERATOR")
+                .requestMatchers(HttpMethod.POST, "/api/v1/nodes/enroll", "/api/v1/nodes/*/heartbeat", "/api/v1/incidents", "/api/v1/incidents/with-evidence", "/api/v1/evidence/*/image").hasAnyRole("DEVICE", "NODE", "ADMIN", "OPERATOR")
                 .requestMatchers("/api/v1/commands/**").hasAnyRole("DEVICE", "NODE", "ADMIN", "OPERATOR")
                 .anyRequest().authenticated()
             )
