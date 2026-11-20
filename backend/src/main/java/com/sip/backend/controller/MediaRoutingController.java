@@ -61,6 +61,8 @@ public class MediaRoutingController {
             @RequestParam String nodeId,
             @RequestParam String mediaType,
             @RequestParam("file") MultipartFile file) {
+        log.info("Received test media upload: node={}, mediaType={}, filename={}, contentType={}, sizeBytes={}",
+                nodeId, mediaType, file.getOriginalFilename(), file.getContentType(), file.getSize());
         try {
             if (file.isEmpty()) {
                 return ResponseEntity.badRequest().body(Map.of("error", "Empty file"));
