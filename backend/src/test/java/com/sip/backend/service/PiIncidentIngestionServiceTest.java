@@ -54,6 +54,8 @@ class PiIncidentIngestionServiceTest {
         persistedDetection.confidence = 0.93;
         when(detections.findByIncidentId("evt-ci-0001")).thenReturn(Optional.of(persistedDetection));
         when(responses.save(any(ResponseEvent.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(responses.findByIncidentIdOrderByTimestampDesc("evt-ci-0001"))
+                .thenReturn(List.of(new ResponseEvent()));
         when(mapper.toDto(any(Incident.class))).thenReturn(new IncidentDto());
         DetectionResultDto detectionDto = new DetectionResultDto();
         detectionDto.predictedClass = "gun,knife";
